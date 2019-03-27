@@ -1,210 +1,144 @@
-# CrossGuid [![Build Status](https://travis-ci.org/graeme-hill/crossguid.svg?branch=master)](https://travis-ci.org/graeme-hill/crossguid)
+# CrossGuid
 
-CrossGuid is a minimal, cross platform, C++ GUID library. It uses the best
-native GUID/UUID generator on the given platform and has a generic class for
-parsing, stringifying, and comparing IDs. The guid generation technique is
-determined by your platform:
-
-## Linux
-
-On linux you can use `libuuid` which is pretty standard. On distros like Ubuntu
-it is available by default but to use it you need the header files so you have
-to do:
-
-    sudo apt-get install uuid-dev
-
-## Mac/iOS
-
-On Mac or iOS you can use `CFUUIDCreate` from `CoreFoundation`. Since it's a
-plain C function you don't even need to compile as Objective-C++.
-
-## Windows
-
-On Windows we just use the the built-in function `CoCreateGuid`. CMake can
-generate a Visual Studio project if that's your thing.
-
-## Android
-
-The Android version uses a handle to a `JNIEnv` object to invoke the
-`randomUUID()` function on `java.util.UUID` from C++. The Android specific code
-is all in the `android/` subdirectory. If you have an emulator already running,
-then you can run the `android.sh` script in the root directory. It has the
-following requirements:
-
-- Android emulator is already running (or you have physical device connected).
-- You're using bash.
-- adb is in your path.
-- You have an Android sdk setup including `ANDROID_HOME` environment variable.
-
-## Versions
-
-This is version 0.2 of CrossGuid. If you all already using CrossGuid and your code
-uses `GuidGenerator` then you are using version 0.1. Differences in version 0.2:
-
-- Put everything inside the namespace `xg` instead of using the global
-  namespace.
-- Removed `GuidGenerator` class and replaced with the free function
-  `xg::newGuid`. This is the way I originally wanted it to work but since Android
-  is a special snowflake requiring state (`JNIEnv *`) I introduced the
-  `GuidGenerator` class specifically so that there would be somewhere to store
-  the `JNIEnv *` when running on Android. However, this basically meant
-  complicating the library for the sake of one platform. In version 0.2 the goal is
-  to design for the normal platforms and let Android be weird. In Android you just
-  need to run `xg::initJni(JNIEnv *)` before you create any guids. The `JNIEnv *`
-  is just stored as a global variable.
-- Added CMake build system. Instead of different scripts for each platform you
-  can just run cmake and it should handle each platform (except Android which
-  again is special).
-- Actual guid bytes are stored in `std::array<unsigned char, 16>` instead of
-  `std::vector<unsigned char>`.
-- More error checking (like if you try to create a guid with invalid number of
-  bytes).
-
-If you're happily using version 0.1 then there's not really any reason to
-change.
-
-## Compiling
-
-Just do the normal cmake thing:
-
-```
-mkdir build
-cd build
-cmake ..
-make install
-```
-
-## Running tests
-
-After compiling as described above you should get two files: `libcrossguid.a` (the
-static library) and `crossguid-test` (the test runner). So to run the tests just do:
-
-```
-./crossguid-test
-```
-
-## Basic usage
-
-### Creating guids
-
-Create a new random guid:
+[![Build Status](https://travis-ci.com/eliaskosunen/crossguid.svg?branch=master)](https://travis-ci.com/eliaskosunen/crossguid)
+[![Build Status](https://ci.appveyor.com/api/projects/status/wvys0ea2k21hqiya/branch/master?svg=true)](https://ci.appveyor.com/project/eliaskosunen/crossguid/branch/master)
+[![License](https://img.shields.io/github/license/eliaskosunen/crossguid.svg)](https://github.com/eliaskosunen/crossguid/blob/master/LICENSE)
+[![C++ Standard](https://img.shields.io/badge/C%2B%2B-11%2F14%2F17%2F20-blue.svg)](https://img.shields.io/badge/C%2B%2B-11%2F14%2F17%2F20-blue.svg)
 
 ```cpp
 #include <crossguid/guid.hpp>
-...
-auto g = xg::newGuid();
-```
+#include <iostream>
+#include <unordered_map>
 
-**NOTE:** On Android you need to call `xg::initJni(JNIEnv *)` first so that it
-is possible for `xg::newGuid()` to call back into java libraries. `initJni`
-only needs to be called once when the process starts.
-
-Create a new zero guid:
-
-```cpp
-xg::Guid g;
-```
-
-Create from a string:
-
-```cpp
-xg::Guid g("c405c66c-ccbb-4ffd-9b62-c286c0fd7a3b");
-```
-
-### Checking validity
-
-If you have some string value and you need to check whether it is a valid guid
-then you can simply attempt to construct the guid:
-
-```cpp
-xg::Guid g("bad-guid-string");
-if (!g.isValid())
+int main()
 {
-	// do stuff
+    // Creating a new GUID
+    auto g = xg::make_guid();
+    // guid is DefaultConstructible
+    xg::guid empty{};
+    // and can also be created from a string (const char*)
+    xg::guid from_string{"c405c66c-ccbb-4ffd-9b62-c286c0fd7a3b"};
+    // or an array of bytes (unsigned char)
+    std::array<unsigned char, 16> bytes_std_array{{0}};
+    xg::guid from_std_array{std::move(bytes_std_array)};
+    unsigned char bytes_c_array[16] = {0};
+    xg::guid from_c_array{bytes_c_array};
+
+    // guid is convertible to a bool
+    if (g) {
+        std::cout << "This GUID is fine!\n";
+    }
+    if (!empty) {
+        std::cout << "This GUID is _not_ fine!\n";
+    }
+
+    // guids are EqualityComparable
+    if (g != from_string) {
+        std::cout << "Different GUIDs are not equal\n";
+    }
+
+    // guids can be converted to a std::string
+    auto guid_str = g.str();
+    // or be streamed to a std::ostream
+    std::cout << "Here's my GUID: " << g << '\n';
+
+    // accessing raw bytes
+    const std::array<unsigned char, 16>& bytes = g.bytes();
+
+    // guid specializes std::hash and std::less,
+    // so they can be used as keys in std::map, std::set etc.
+    std::unordered_map<xg::guid, int> hashmap{};
 }
 ```
 
-If the guid string is not valid then all bytes are set to zero and `isValid()`
-returns `false`.
+This repository is a source-incompatible fork of https://github.com/graeme-hill/crossguid,
+a library by Graeme Hill.
 
-### Converting guid to string
+CrossGuid is a minimal, cross platform, C++ GUID library.
+It uses the best native GUID/UUID generator on the given platform.
 
-First of all, there is normally no reason to convert a guid to a string except
-for in debugging or when serializing for API calls or whatever. You should
-definitely avoid storing guids as strings or using strings for any
-computations. If you do need to convert a guid to a string, then you can
-utilize strings because the `<<` operator is overloaded. To print a guid to
-`std::cout`:
+## Changes to the original repository
 
-```cpp
-void doGuidStuff()
-{
-    auto myGuid = xg::newGuid();
-    std::cout << "Here is a guid: " << myGuid << std::endl;
-}
+ * Dropped Android support
+ * Supports C++11 and 14 (doesn't depend on `std::string_view`)
+ * Compiles without warnings, even on the most aggressive levels (see `CMakeLists.txt`)
+ * Names are in `snake_case`, to be more in line with the C++ standard library
+ * Doesn't auto-convert to `std::string` to prevent surprises
+ * `isValid` member function replaced with `operator bool`
+ * `newGuid` renamed to `make_guid` for better consistency with stdlib and to remove connotation of allocation
+ * `constexpr` enabled and `noexcept` annotated, in line with the Lakos rule
+ * Does the Right Thing (tm) by not defining `operator<` and specializing `std::less` instead
+ * Faster compile times (doesn't include redundant headers)
+
+## Dependencies
+
+CrossGuid depends on the standard guid generation facilities on your platform,
+which may need to be installed separately. See below for instructions for your specific platform.
+
+### Linux
+
+On Linux, CrossGuid uses `libuuid`. The library may already be installed on your system, but the header files
+may be missing. For example, on Ubuntu, the package `uuid-dev` may need to be installed.
+
+### Windows
+
+On Windows, CrossGuid uses the WinAPI function `CoCreateGuid`, which is avaliable on all Windows systems from 2000 onwards.
+
+### macOS/iOS
+
+On Apple systems, CrossGuid uses `CFUUIDCreate` from `CoreFoundation`.
+
+## Installation
+
+CrossGuid can easily be integrated into your project if you use CMake.
+Just clone it in your project, and use `add_subdirectory`.
+The target `crossguid::crossguid` becomes available, which can be then linked against.
+
+If you don't use CMake in your project, or for some reason wish to build CrossGuid separately,
+it can be done with the standard CMake procedure:
+
+```sh
+mkdir build
+cd build
+cmake ..
+make -j && make install
 ```
 
-Or to store a guid in a `std::string`:
+### Tests
 
-```cpp
-void doGuidStuff()
-{
-    auto myGuid = xg::newGuid();
-    std::stringstream stream;
-    stream << myGuid;
-    auto guidString = stream.str();
-}
+Tests will only be built by default if CrossGuid is compiled as a standalone project,
+or if `CROSSGUID_TESTS` is set to `ON` in CMake.
+
+```sh
+cmake -DCROSSGUID_TESTS=ON ..
 ```
 
-There is also a `str()` function that returns a `std::string`:
+The tests can then be run with `CTest`.
 
-```cpp
-std::string guidStr = xg::newGuid().str();
+```sh
+ctest
 ```
 
-### Creating a guid from raw bytes
+## API Documentation
 
-It's unlikely that you will need this, but this is done within the library
-internally to construct a `Guid` object from the raw data given by the system's
-built-in guid generation function. There are two key constructors for this:
+Documentation for the latest commit to `master` is hosted [online](http://docs.eliaskosunen.com/crossguid/doc_guid.html).
 
-```cpp
-Guid(std::array<unsigned char, 16> &bytes);
+API documentation can be generated with [standardese](https://github.com/foonathan/standardese).
+
+```sh
+cd build
+# Generate compile_commands.json
+cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
+cd ../doc
+./generate-doc.sh (path-to-standardese-tool-binary)
 ```
-
-and
-
-```cpp
-Guid(const unsigned char * bytes);
-```
-
-When possible prefer the `std::array` constructor because it is safer. If you
-pass in an incorrectly sized C array then bad things will happen.
-
-### Comparing guids
-
-`==` and `!=` are implemented, so the following works as expected:
-
-```cpp
-void doGuidStuff()
-{
-    auto guid1 = xg::newGuid();
-    auto guid2 = xg::newGuid();
-
-    auto guidsAreEqual = guid1 == guid2;
-    auto guidsAreNotEqual = guid1 != guid2;
-}
-```
-
-### Hashing guids
-
-Guids can be used directly in containers requireing `std::hash` such as `std::map,`std::unordered_map` etc.
 
 ## License
 
 The MIT License (MIT)
 
-Copyright (c) 2014 Graeme Hill (http://graemehill.ca)
+Copyright (c) 2014 Graeme Hill (http://graemehill.ca)  
+Copyright (c) 2019 Elias Kosunen (https://eliaskosunen.com)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

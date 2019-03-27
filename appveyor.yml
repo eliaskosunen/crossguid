@@ -1,0 +1,32 @@
+version: 0.3.0.{build}
+clone_depth: 1
+
+environment:
+  MSVC_DEFAULT_OPTIONS: ON
+  matrix:
+    - gen: "Visual Studio 14 2015"
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+    - gen: "Visual Studio 15 2017"
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+
+init:
+  - cmake --version
+
+before_build:
+  - git submodule update --init --recursive
+
+build_script:
+  - md build_32
+  - cd build_32
+  - cmake -G "%gen%" ..
+  - cmake --build . --config Debug -- /maxcpucount
+  - ctest -C Debug -V
+  - cd ..
+
+  - md build_64
+  - cd build_64
+  - cmake -G "%gen% Win64" ..
+  - cmake --build . --config Debug -- /maxcpucount
+  - ctest -C Debug -V
+  - cd ..
+

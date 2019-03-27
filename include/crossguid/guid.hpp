@@ -1,149 +1,270 @@
-/*
-The MIT License (MIT)
-
-Copyright (c) 2014 Graeme Hill (http://graemehill.ca)
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-*/
+// Copyright (c) 2014 Graeme Hill (http://graemehill.ca)
+// Copyright (c) 2018 Elias Kosunen (https://eliaskosunen.com)
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+//
+// This file is a part of crossguid:
+//   https://github.com/eliaskosunen/crossguid
 
 #pragma once
 
-#ifdef GUID_ANDROID
-#include <thread>
-#include <jni.h>
-#endif
-
-#include <functional>
-#include <iostream>
 #include <array>
-#include <sstream>
-#include <string_view>
-#include <utility>
-#include <iomanip>
+#include <iosfwd>
+#include <string>
 
-#define BEGIN_XG_NAMESPACE namespace xg {
-#define END_XG_NAMESPACE }
+// Check for C++14 constexpr
+#ifndef XG_HAS_RELAXED_CONSTEXPR
+#if (defined(__cpp_constexpr) && __cpp_constexpr >= 201304L) || \
+    (defined(__GNUC__) && __GNUC__ >= 5) ||                     \
+    (defined(__clang__) && defined(__clang_minor__) &&          \
+     (__clang__ * 100 + __clang_minor__) >= 304) ||             \
+    (defined(_MSC_VER) && _MSC_VER >= 1910)
+#define XG_HAS_RELAXED_CONSTEXPR 1
+#else
+#define XG_HAS_RELAXED_CONSTEXPR 0
+#endif
+#endif  // !defined(XG_HAS_RELAXED_CONSTEXPR)
 
-BEGIN_XG_NAMESPACE
-
-// Class to represent a GUID/UUID. Each instance acts as a wrapper around a
-// 16 byte value that can be passed around by value. It also supports
-// conversion to string (via the stream operator <<) and conversion from a
-// string via constructor.
-class Guid
-{
-public:
-	explicit Guid(const std::array<unsigned char, 16> &bytes);
-	explicit Guid(std::array<unsigned char, 16> &&bytes);
-
-	explicit Guid(std::string_view fromString);
-	Guid();
-	
-	Guid(const Guid &other) = default;
-	Guid &operator=(const Guid &other) = default;
-	Guid(Guid &&other) = default;
-	Guid &operator=(Guid &&other) = default;
-
-	bool operator==(const Guid &other) const;
-	bool operator!=(const Guid &other) const;
-
-	std::string str() const;
-	operator std::string() const;
-	const std::array<unsigned char, 16>& bytes() const;
-	void swap(Guid &other);
-	bool isValid() const;
-
-private:
-	void zeroify();
-
-	// actual data
-	std::array<unsigned char, 16> _bytes;
-
-	// make the << operator a friend so it can access _bytes
-	friend std::ostream &operator<<(std::ostream &s, const Guid &guid);
-	friend bool operator<(const Guid &lhs, const Guid &rhs);
-};
-
-Guid newGuid();
-
-#ifdef GUID_ANDROID
-struct AndroidGuidInfo
-{
-	static AndroidGuidInfo fromJniEnv(JNIEnv *env);
-
-	JNIEnv *env;
-	jclass uuidClass;
-	jmethodID newGuidMethod;
-	jmethodID mostSignificantBitsMethod;
-	jmethodID leastSignificantBitsMethod;
-	std::thread::id initThreadId;
-};
-
-extern AndroidGuidInfo androidInfo;
-
-void initJni(JNIEnv *env);
-
-// overloading for multi-threaded calls
-Guid newGuid(JNIEnv *env);
+#if XG_HAS_RELAXED_CONSTEXPR
+/// \exclude
+#define XG_CONSTEXPR14 constexpr
+#else
+/// \exclude
+#define XG_CONSTEXPR14 /*constexpr*/
 #endif
 
-namespace details
-{
-	template <typename...> struct hash;
+namespace xg {
+    /// A GUID (Globally Unique IDentifier)/UUID (Universally Unique
+    /// IDentifier).
+    ///
+    /// The byte representation of a GUID is a 128-bit unsigned integer, stored
+    /// at a byte (`unsigned char`) array of 16 elements.
+    ///
+    /// The textual representation of a GUID is a string with a total of 36
+    /// characters, displayed in 5 groups separated by hyphens, in the form
+    /// 8-4-4-4-12, for a total of 36 characters (32 hexadecimal digits and 4
+    /// hyphens).
+    ///
+    /// There is a special GUID value, called the nil value, which has all of
+    /// its bits in its byte representation set to `0`. The nil value represents
+    /// an invalid GUID.
+    class guid {
+    public:
+        /// \effects Constructs a nil GUID.
+        /// \output_section Constructors
+        XG_CONSTEXPR14 guid() noexcept = default;
 
-	template<typename T> 
-	struct hash<T> : public std::hash<T>
-	{
-		using std::hash<T>::hash;
-	};
+        /// \effects Constructs a GUID from a byte representation.
+        constexpr explicit guid(std::array<unsigned char, 16> b) noexcept
+            : _bytes{std::move(b)}
+        {
+        }
+        /// \effects Constructs a GUID from a byte representation.
+        explicit guid(const unsigned char (&b)[16]) noexcept : _bytes{{0}}
+        {
+            std::copy(b, b + 16, _bytes.begin());
+        }
+        /// \effects Constructs a GUID from a textual representation.
+        /// If `data` is not a valid GUID textual representation, `*this` will
+        /// contain a nil GUID.
+        ///
+        /// \throws Nothing
+        ///
+        /// \remarks `data` doesn't need to be in the canonical textual
+        /// representation form, like returned by
+        /// [`str()`](standardese://str_ret/). Hyphens (`-`) are skipped in the
+        /// parsing process, so there can be any number of hyphens.
+        /// Alphabetic hexadecimal digits (a-f) can be both uppercase or
+        /// lowercase.
+        explicit guid(const char* s);
 
+        /// \effects Populates `s` with the textual representation of the GUID
+        /// contained in `*this`.
+        /// Equivalent to: `s.clear(); str_to(std::back_inserter(s));`
+        ///
+        /// \throws Any exceptions thrown by `s`.
+        ///
+        /// \unique_name str_ref
+        /// \output_section Textual representation
+        void str(std::string& s) const;
+        /// \effects Equivalent to: `std::string s; guid.str(s); return s;`.
+        ///
+        /// \returns The textual representation of the GUID contained in
+        /// `*this`.
+        ///
+        /// \throws Any exceptions thrown by `s`.
+        ///
+        /// \unique_name str_ret
+        std::string str() const;
 
-	template <typename T, typename... Rest>
-	struct hash<T, Rest...>
-	{
-		inline std::size_t operator()(const T& v, const Rest&... rest) {
-			std::size_t seed = hash<Rest...>{}(rest...);
-			seed ^= hash<T>{}(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-			return seed;
-		}
-	};
-}
+        /// \requires `OutputIt` must meet the requirements of
+        /// `LegacyOutputIterator`.
+        /// `std::iterator_traits<OutputIt>::value_type` must be `char`.
+        /// The range beginning at `it` must be long enough to hold the 36
+        /// characters needed for the textual representation of a GUID.
+        ///
+        /// \effects Assigns `char`s for the textual representation of the GUID
+        /// contained in `*this` to the range beginning at `it`.
+        ///
+        /// \returns Iterator one past the last element assigned.
+        ///
+        /// \throws Any exceptions throw by incrementing, dereferencing or
+        /// assigning to `it`.
+        ///
+        /// \unique_name str_to
+        template <typename OutputIt>
+        OutputIt str_to(OutputIt it) const;
 
-END_XG_NAMESPACE
+        /// \returns A constant reference to the byte representation of the GUID
+        /// contained in `*this`.
+        ///
+        /// \output_section Byte representation
+        constexpr const std::array<unsigned char, 16>& bytes() const noexcept
+        {
+            return _bytes;
+        }
+        /// \returns A pointer to the beginning of the byte representation of
+        /// the GUID contained in `*this`.
+        ///
+        /// \notes The byte representation of a GUID is 16 bytes long.
+        const unsigned char* data() const noexcept
+        {
+            return _bytes.data();
+        }
 
-namespace std
-{
-	// Template specialization for std::swap<Guid>() --
-	// See guid.cpp for the function definition
-	template <>
-	void swap(xg::Guid &guid0, xg::Guid &guid1) noexcept;
+        /// \returns `true` if `*this` represents a valid GUID.
+        /// \unique_name operator_bool
+        /// \output_section Operators
+        explicit operator bool() const noexcept;
 
-	// Specialization for std::hash<Guid> -- this implementation
-	// uses std::hash<std::string> on the stringification of the guid
-	// to calculate the hash
-	template <>
-	struct hash<xg::Guid>
-	{
-		std::size_t operator()(xg::Guid const &guid) const
-		{
-			const uint64_t* p = reinterpret_cast<const uint64_t*>(guid.bytes().data());
-			return xg::details::hash<uint64_t, uint64_t>{}(p[0], p[1]);
-		}
-	};
-}
+        /// \effects Swaps the GUID contained in `*this` with that contained in
+        /// `other`.
+        void swap(guid& other) noexcept;
+
+    private:
+        void zeroify() noexcept;
+
+        std::array<unsigned char, 16> _bytes{{0}};
+    };
+
+    /// \effects Streams the textual representation of `guid` into `s`.
+    /// \returns `s`
+    std::ostream& operator<<(std::ostream& s, const guid& guid);
+
+    /// Creates a valid GUID.
+    /// \effects Creates a GUID using platform APIs.
+    /// \returns A valid [xg::guid]().
+    guid make_guid();
+
+    /// \returns `true` if the GUIDs contained in `lhs` and `rhs` compare equal.
+    inline bool operator==(const guid& lhs, const guid& rhs) noexcept
+    {
+        return lhs.bytes() == rhs.bytes();
+    }
+
+    /// \returns `false` if the GUIDs contained in `lhs` and `rhs` compare
+    /// equal.
+    inline bool operator!=(const guid& lhs, const guid& rhs) noexcept
+    {
+        return !(operator==(lhs, rhs));
+    }
+
+    // definitions
+
+    /// \exclude
+    inline guid::operator bool() const noexcept
+    {
+        guid empty;
+        return *this != empty;
+    }
+
+    /// \exclude
+    inline void guid::str(std::string& s) const
+    {
+        s.clear();
+        s.resize(36);
+        str_to(s.begin());
+    }
+    /// \exclude
+    inline std::string guid::str() const
+    {
+        std::string s;
+        str(s);
+        return s;
+    }
+
+    /// \exclude
+    template <typename OutputIt>
+    OutputIt guid::str_to(OutputIt it) const
+    {
+        char one[9], two[5], three[5], four[5], five[13];
+
+        snprintf(one, 9, "%02x%02x%02x%02x", _bytes[0], _bytes[1], _bytes[2],
+                 _bytes[3]);
+        snprintf(two, 5, "%02x%02x", _bytes[4], _bytes[5]);
+        snprintf(three, 5, "%02x%02x", _bytes[6], _bytes[7]);
+        snprintf(four, 5, "%02x%02x", _bytes[8], _bytes[9]);
+        snprintf(five, 13, "%02x%02x%02x%02x%02x%02x", _bytes[10], _bytes[11],
+                 _bytes[12], _bytes[13], _bytes[14], _bytes[15]);
+
+        it = std::copy(one, one + 8, it);
+        *it++ = '-';
+        it = std::copy(two, two + 4, it);
+        *it++ = '-';
+        it = std::copy(three, three + 4, it);
+        *it++ = '-';
+        it = std::copy(four, four + 4, it);
+        *it++ = '-';
+        it = std::copy(five, five + 12, it);
+        return it;
+    }
+
+    /// \exclude
+    inline void guid::zeroify() noexcept
+    {
+        std::fill(_bytes.begin(), _bytes.end(), static_cast<unsigned char>(0));
+    }
+
+    /// \exclude
+    inline void guid::swap(guid& other) noexcept
+    {
+        _bytes.swap(other._bytes);
+    }
+}  // namespace xg
+
+namespace std {
+    template <>
+    inline void swap(xg::guid& lhs, xg::guid& rhs) noexcept
+    {
+        lhs.swap(rhs);
+    }
+
+    template <>
+    struct less<xg::guid> {
+        inline bool operator()(const xg::guid& lhs, const xg::guid& rhs) const
+        {
+            return lhs.bytes() < rhs.bytes();
+        }
+    };
+
+    template <>
+    struct hash<xg::guid> {
+        std::size_t operator()(const xg::guid& guid) const;
+    };
+}  // namespace std
