@@ -1,7 +1,7 @@
 # CrossGuid
 
-[![Build Status](https://travis-ci.com/eliaskosunen/crossguid.svg?branch=master)](https://travis-ci.com/eliaskosunen/crossguid)
-[![Build Status](https://ci.appveyor.com/api/projects/status/wvys0ea2k21hqiya/branch/master?svg=true)](https://ci.appveyor.com/project/eliaskosunen/crossguid/branch/master)
+[![Build Status (Linux/macOS)](https://travis-ci.com/eliaskosunen/crossguid.svg?branch=master)](https://travis-ci.com/eliaskosunen/crossguid)
+[![Build Status (Windows)](https://ci.appveyor.com/api/projects/status/fntdbjhb2amffo69/branch/master?svg=true)](https://ci.appveyor.com/project/eliaskosunen/crossguid/branch/master)
 [![License](https://img.shields.io/github/license/eliaskosunen/crossguid.svg)](https://github.com/eliaskosunen/crossguid/blob/master/LICENSE)
 [![C++ Standard](https://img.shields.io/badge/C%2B%2B-11%2F14%2F17%2F20-blue.svg)](https://img.shields.io/badge/C%2B%2B-11%2F14%2F17%2F20-blue.svg)
 
