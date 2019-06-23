@@ -172,6 +172,10 @@ namespace xg {
     /// \returns A valid [xg::guid]().
     guid make_guid();
 
+    /// Creates a GUID from a byte representation.
+    /// \requires Range starting from `p` must be at least 16 elements long.
+    guid make_guid_from_bytes(unsigned char* p);
+
     /// \returns `true` if the GUIDs contained in `lhs` and `rhs` compare equal.
     inline bool operator==(const guid& lhs, const guid& rhs) noexcept
     {

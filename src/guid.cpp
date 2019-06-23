@@ -159,6 +159,13 @@ namespace xg {
         return s;
     }
 
+    guid make_guid_from_bytes(unsigned char* p)
+    {
+        std::array<unsigned char, 16> data;
+        std::copy(p, p + 16, data.data());
+        return guid(data);
+    }
+
 // linux friendly implementation
 // could work on other systems that have libuuid available
 #ifdef GUID_LIBUUID
